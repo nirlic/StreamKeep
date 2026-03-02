@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamKeep — Chat Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0d0f12;
+    --surface:   #151820;
+    --border:    #232733;
+    --accent:    #00e5ff;
+    --accent2:   #ff4d6d;
+    --text:      #e2e8f0;
+    --muted:     #5a6380;
+    --live:      #ff4d6d;
+    --synced:    #00e5ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 16px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:0.5; transform:scale(0.7); }
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: #00c4da; color: #000; border-color: #00c4da; }
+
+  .btn-danger {
+    background: var(--accent2);
+    color: #fff;
+    border-color: var(--accent2);
+  }
+  .btn-danger:hover { background: #e03356; color: #fff; }
+
+  .time-input {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .time-input input {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    width: 70px;
+    text-align: center;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .status-badge.loaded { border-color: var(--accent); color: var(--accent); }
+  .status-badge.synced { border-color: #00e5ff; color: #00e5ff; }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── INSTRUCTIONS PANEL ── */
+  .instructions {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .instructions-card {
+    max-width: 480px;
+    text-align: center;
+  }
+
+  .instructions-card h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  .instructions-card p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 28px;
+  }
+
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+    margin-bottom: 28px;
+  }
+
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+
+  .step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #000;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  .step-text strong { color: var(--accent); }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 30px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--surface);
+  }
+
+  .drop-zone:hover, .drop-zone.dragging {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.04);
+  }
+
+  .drop-zone p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .drop-zone .drop-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  /* ── CHAT PANEL ── */
+  .chat-panel {
+    width: 340px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+  }
+
+  .chat-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .msg-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  .chat-feed {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    scroll-behavior: smooth;
+  }
+
+  .chat-feed::-webkit-scrollbar { width: 4px; }
+  .chat-feed::-webkit-scrollbar-track { background: transparent; }
+  .chat-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .chat-msg {
+    padding: 4px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    transition: background 0.1s;
+  }
+
+  .chat-msg:hover { background: rgba(255,255,255,0.03); }
+
+  .chat-msg.superchat {
+    background: rgba(255,77,109,0.08);
+    border-left: 3px solid var(--accent2);
+    margin: 4px 0;
+    padding: 6px 14px;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .chat-msg.membership {
+    background: rgba(0,229,255,0.06);
+    border-left: 3px solid var(--accent);
+    margin: 4px 0;
+    padding: 6px 14px;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .msg-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 1px;
+  }
+
+  .msg-time {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .msg-author {
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .msg-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .badge-mod   { background: rgba(0,229,255,0.15); color: var(--accent); }
+  .badge-owner { background: rgba(255,215,0,0.15); color: gold; }
+  .badge-sub   { background: rgba(128,90,213,0.2); color: #a78bfa; }
+
+  .msg-text {
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .superchat-amount {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 2px;
+  }
+
+  /* ── EMPTY STATE ── */
+  .chat-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .chat-empty .empty-icon { font-size: 32px; opacity: 0.4; }
+
+  /* ── SYNC BAR ── */
+  .sync-bar {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sync-info {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .sync-info span:last-child { color: var(--accent); }
+
+  .hidden { display: none !important; }
+
+  /* ── FILE INPUT ── */
+  #fileInput { display: none; }
+
+  /* ── SCROLL LOCK ── */
+  .scroll-lock-btn {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Barlow', sans-serif;
+    transition: all 0.15s;
+  }
+  .scroll-lock-btn.active { border-color: var(--accent); color: var(--accent); }
+
+  /* ── HELP TEXT ── */
+  .help-text {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    padding: 6px 14px 10px;
+    line-height: 1.5;
+  }
+
+  .help-text a { color: var(--accent); text-decoration: none; }
+  .help-text a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    StreamKeep <span style="opacity:0.4;font-size:11px;margin-left:6px;">by Nirlicnick</span>
+  </div>
+
+  <div class="header-controls">
+    <button class="btn" onclick="document.getElementById('fileInput').click()">
+      📂 Load Chat File (.json3)
+    </button>
+
+    <div class="time-input" title="Enter the current YouTube video timestamp (H:MM:SS) then click Sync">
+      ⏱
+      <input type="text" id="timestampInput" placeholder="0:00:00" />
+    </div>
+
+    <button class="btn btn-primary" id="syncBtn" onclick="syncToTime()">
+      ↺ Sync
+    </button>
+
+    <button class="btn" id="autoSyncBtn" onclick="toggleAutoSync()" title="Auto-sync updates every 5 seconds based on your manually entered time">
+      ⚡ Auto-sync: OFF
+    </button>
+  </div>
+
+  <div class="status-badge" id="statusBadge">
+    <div class="status-dot"></div>
+    No file loaded
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Instructions shown before file is loaded -->
+  <div class="instructions" id="instructions">
+    <div class="instructions-card">
+      <h2>StreamKeep — Chat Viewer</h2>
+      <p>Replay archived YouTube live chat in sync with your video. Created by <strong>Nirlicnick</strong>.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Download the <strong>.json3 chat file</strong> from the video description and save it anywhere on your PC.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">Click <strong>Load Chat File</strong> above and select the downloaded <strong>.json3</strong> file.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">Start the YouTube video. Type the <strong>current timestamp</strong> (e.g. <strong>1:23:45</strong>) into the box above and click <strong>Sync</strong>.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">Re-sync anytime by entering a new timestamp. Use <strong>Auto-sync</strong> if you want it to update automatically every few seconds.</div>
+        </div>
+      </div>
+
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="drop-icon">💬</div>
+        <p>Click here or drag & drop your <strong>.json3</strong> file</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat panel — always visible on right -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <span>Live Chat</span>
+      <span class="msg-count" id="msgCount">—</span>
+    </div>
+
+    <div id="chatEmpty" class="chat-empty">
+      <div class="empty-icon">💬</div>
+      <span>Load a chat file to begin</span>
+    </div>
+
+    <div class="chat-feed hidden" id="chatFeed"></div>
+
+    <div class="sync-bar hidden" id="syncBar">
+      <div class="sync-info">
+        <span>Showing chat at</span>
+        <span id="currentSyncTime">—</span>
+      </div>
+      <div class="sync-info">
+        <span>Messages shown</span>
+        <span id="visibleCount">0</span>
+      </div>
+    </div>
+
+    <div class="help-text hidden" id="helpText">
+      Enter the YouTube timestamp above<br>and click <strong>Sync</strong> to jump to that moment.
+    </div>
+
+    <div style="padding:8px 14px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;" id="scrollBar" class="hidden">
+      <span style="font-size:11px;color:var(--muted)">Auto-scroll</span>
+      <button class="scroll-lock-btn active" id="scrollLockBtn" onclick="toggleScrollLock()">ON</button>
+    </div>
+  </div>
+
+</div>
+
+<input type="file" id="fileInput" accept=".json3,.json" onchange="loadFile(event)">
+
+<script>
+  let allMessages = [];
+  let autoSyncInterval = null;
+  let autoSyncEnabled = false;
+  let autoSyncOffset = 0;
+  let autoSyncStartWall = 0;
+  let scrollLocked = true;
+
+  // ── DRAG AND DROP ──
+  const dropZone = document.getElementById('dropZone');
+  document.body.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  document.body.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+  document.body.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragging');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+
+  // ── LOAD FILE ──
+  function loadFile(e) {
+    const file = e.target.files[0];
+    if (file) processFile(file);
+  }
+
+  function processFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const raw = e.target.result;
+        allMessages = parseJson3(raw);
+        allMessages.sort((a, b) => a.time - b.time);
+        // No normalization needed - videoOffsetTimeMsec is already stream-relative in seconds
+
+        document.getElementById('instructions').classList.add('hidden');
+        document.getElementById('chatEmpty').classList.add('hidden');
+        document.getElementById('chatFeed').classList.remove('hidden');
+        document.getElementById('syncBar').classList.remove('hidden');
+        document.getElementById('helpText').classList.remove('hidden');
+        document.getElementById('scrollBar').classList.remove('hidden');
+
+        const badge = document.getElementById('statusBadge');
+        badge.className = 'status-badge loaded';
+        badge.innerHTML = '<div class="status-dot"></div> ' + allMessages.length.toLocaleString() + ' messages loaded';
+
+        document.getElementById('msgCount').textContent = allMessages.length.toLocaleString() + ' msgs';
+
+        // Start from the first message (may be negative offset before stream)
+        const firstTime = allMessages.length > 0 ? allMessages[0].time : 0;
+        const displayStart = Math.min(0, firstTime); // show from negative offset if needed
+        autoSyncEnabled = true;
+        const autoBtn = document.getElementById('autoSyncBtn');
+        if (autoBtn) {
+          autoBtn.textContent = '⚡ Auto-sync: ON';
+          autoBtn.className = 'btn btn-danger';
+        }
+        document.getElementById('timestampInput').value = formatTime(Math.max(0, Math.floor(firstTime)));
+        startChat(firstTime);
+
+      } catch(err) {
+        alert('Could not parse chat file. Make sure it is a valid .json3 file from yt-dlp.\n\nError: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ── PARSE JSON3 ── (robust multi-format parser)
+  function parseJson3(raw) {
+    const lines = raw.trim().split('\n');
+    const messages = [];
+    let parsed = 0, skipped = 0;
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        parsed++;
+
+        // Try all known yt-dlp json3 structures
+        const extracted = tryExtractMessage(obj);
+        if (extracted) {
+          messages.push(extracted);
+        } else {
+          skipped++;
+        }
+      } catch(e) {
+        skipped++;
+      }
+    }
+
+    console.log(`Parsed ${parsed} lines, got ${messages.length} messages, skipped ${skipped}`);
+
+    // If nothing found, show a useful error
+    if (messages.length === 0 && parsed > 0) {
+      // Log a sample line so we can debug
+      try {
+        const sample = JSON.parse(lines.find(l => l.trim()));
+        console.log('Sample line structure:', JSON.stringify(sample, null, 2).slice(0, 500));
+      } catch(e) {}
+      throw new Error(`File loaded (${parsed} lines) but no chat messages could be extracted. Check browser console for details.`);
+    }
+
+    return messages;
+  }
+
+  function tryExtractMessage(obj) {
+    // videoOffsetTimeMsec is the stream-relative timestamp — use this!
+    const offsetMs = obj?.videoOffsetTimeMsec !== undefined
+      ? parseInt(obj.videoOffsetTimeMsec)
+      : null;
+
+    if (obj?.replayChatItemAction) {
+      const actions = obj.replayChatItemAction?.actions || [];
+      for (const action of actions) {
+        const item = action?.addChatItemAction?.item;
+        if (!item) continue;
+        const msg = tryExtractFromItem(item, offsetMs);
+        if (msg) return msg;
+      }
+    }
+
+    if (obj?.addChatItemAction) {
+      const item = obj.addChatItemAction?.item;
+      if (item) {
+        const msg = tryExtractFromItem(item, offsetMs);
+        if (msg) return msg;
+      }
+    }
+
+    return null;
+  }
+
+  function tryExtractFromItem(item, offsetMs) {
+    const r = item.liveChatTextMessageRenderer;
+    if (r) return extractMessage(r, 'normal', offsetMs);
+
+    const s = item.liveChatPaidMessageRenderer;
+    if (s) {
+      const msg = extractMessage(s, 'superchat', offsetMs);
+      if (msg) msg.amount = s.purchaseAmountText?.simpleText || '';
+      return msg;
+    }
+
+    const m = item.liveChatMembershipItemRenderer;
+    if (m) return extractMessage(m, 'membership', offsetMs);
+
+    const ps = item.liveChatPaidStickerRenderer;
+    if (ps) {
+      const msg = extractMessage(ps, 'superchat', offsetMs);
+      if (msg) { msg.amount = ps.purchaseAmountText?.simpleText || ''; msg.text = msg.text || '[Sticker]'; }
+      return msg;
+    }
+
+    const mg = item.liveChatSponsorshipsGiftPurchaseAnnouncementRenderer;
+    if (mg) return extractMessage(mg?.header?.liveChatSponsorshipsHeaderRenderer || mg, 'membership', offsetMs);
+
+    return null;
+  }
+
+  function extractMessage(renderer, type, offsetMs) {
+    try {
+      // Use videoOffsetTimeMsec (stream-relative) if available, else fall back to timestampUsec
+      let time;
+      if (offsetMs !== null && offsetMs !== undefined) {
+        time = offsetMs / 1000; // ms -> seconds, may be negative (pre-stream)
+      } else {
+        time = parseInt(renderer.timestampUsec || '0') / 1e6;
+      }
+
+      const author =
+        renderer.authorName?.simpleText ||
+        renderer.authorName?.runs?.[0]?.text ||
+        'Unknown';
+
+      let colorHex = null;
+      if (renderer.authorNameTextColor) {
+        colorHex = '#' + (renderer.authorNameTextColor >>> 0).toString(16).padStart(8,'0').slice(2);
+      }
+
+      let text = '';
+      const runSources = [
+        renderer.message?.runs,
+        renderer.headerSubtext?.runs,
+        renderer.headerPrimaryText?.runs,
+        renderer.text?.runs,
+        renderer.subtitle?.runs,
+      ];
+      for (const runs of runSources) {
+        if (!runs || text) continue;
+        for (const run of runs) {
+          if (run.text) text += run.text;
+          else if (run.emoji) {
+            const s = run.emoji.shortcuts;
+            text += (s && s.length) ? s[0] : (run.emoji.emojiId || '🙂');
+          }
+        }
+      }
+      if (!text) text = renderer.message?.simpleText || renderer.headerSubtext?.simpleText || '';
+
+      const badges = [];
+      for (const badge of (renderer.authorBadges || [])) {
+        const label = (
+          badge.liveChatAuthorBadgeRenderer?.tooltip ||
+          badge.liveChatAuthorBadgeRenderer?.accessibility?.accessibilityData?.label || ''
+        ).toLowerCase();
+        if (label.includes('owner') || label.includes('streamer')) badges.push('owner');
+        else if (label.includes('moderator') || label.includes('mod')) badges.push('mod');
+        else if (label.includes('member') || label.includes('subscriber')) badges.push('sub');
+      }
+
+      return { time, author, text: text || '[emoji]', type, badges, color: colorHex };
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // ── CHAT ENGINE ──
+  // Pointer into allMessages — next message to display
+  let msgPointer    = 0;
+  let currentTime   = 0;
+  let tickInterval  = null;
+  const MAX_VISIBLE = 200; // max messages kept in DOM
+
+  function startChat(fromSeconds) {
+    // Stop any existing tick
+    if (tickInterval) clearInterval(tickInterval);
+
+    // Find starting pointer — first message >= fromSeconds
+    msgPointer  = 0;
+    currentTime = fromSeconds;
+    while (msgPointer < allMessages.length && allMessages[msgPointer].time < fromSeconds) {
+      msgPointer++;
+    }
+
+    // Clear feed and show messages up to current time
+    const feed = document.getElementById('chatFeed');
+    feed.innerHTML = '';
+
+    // Show last N messages before this point so chat isn't empty on load
+    const lookback = [];
+    let i = msgPointer - 1;
+    while (i >= 0 && lookback.length < 30) {
+      lookback.unshift(allMessages[i]);
+      i--;
+    }
+    for (const msg of lookback) appendMsg(msg);
+
+    updateSyncBadge(fromSeconds);
+
+    // Always start ticking
+    autoSyncOffset    = fromSeconds;
+    autoSyncStartWall = Date.now();
+    if (tickInterval) clearInterval(tickInterval);
+    tickInterval = setInterval(tick, 250);
+  }
+
+  function tick() {
+    const elapsed = (Date.now() - autoSyncStartWall) / 1000;
+    currentTime   = autoSyncOffset + elapsed;
+
+    // Update timestamp input
+    document.getElementById('timestampInput').value = formatTime(Math.floor(currentTime));
+    updateSyncBadge(currentTime);
+
+    // Append any messages whose time has arrived
+    while (msgPointer < allMessages.length && allMessages[msgPointer].time <= currentTime) {
+      appendMsg(allMessages[msgPointer]);
+      msgPointer++;
+    }
+  }
+
+  function appendMsg(msg) {
+    const feed = document.getElementById('chatFeed');
+    const el   = buildMsgEl(msg);
+    feed.appendChild(el);
+
+    // Trim old messages to keep DOM lean
+    while (feed.children.length > MAX_VISIBLE) {
+      feed.removeChild(feed.firstChild);
+    }
+
+    document.getElementById('visibleCount').textContent = feed.children.length;
+
+    if (scrollLocked) {
+      feed.scrollTop = feed.scrollHeight;
+    }
+  }
+
+  function updateSyncBadge(seconds) {
+    document.getElementById('currentSyncTime').textContent = formatTime(Math.floor(seconds));
+    const badge = document.getElementById('statusBadge');
+    badge.className = 'status-badge synced';
+    badge.innerHTML = '<div class="status-dot"></div> Synced @ ' + formatTime(Math.floor(seconds));
+  }
+
+  function buildMsgEl(msg) {
+    const el = document.createElement('div');
+    el.className = 'chat-msg' +
+      (msg.type === 'superchat'  ? ' superchat'  :
+       msg.type === 'membership' ? ' membership' : '');
+
+    let badgesHtml = '';
+    if (msg.badges.includes('owner')) badgesHtml += '<span class="msg-badge badge-owner">Owner</span>';
+    if (msg.badges.includes('mod'))   badgesHtml += '<span class="msg-badge badge-mod">Mod</span>';
+    if (msg.badges.includes('sub'))   badgesHtml += '<span class="msg-badge badge-sub">Member</span>';
+
+    const authorColor = msg.color || randomAuthorColor(msg.author);
+    const timeStr     = formatTime(Math.floor(msg.time));
+
+    let inner = `<div class="msg-meta">
+      <span class="msg-time">${timeStr}</span>
+      ${badgesHtml}
+      <span class="msg-author" style="color:${authorColor}">${escHtml(msg.author)}</span>
+    </div>`;
+
+    if (msg.type === 'superchat' && msg.amount) {
+      inner += `<div class="superchat-amount">💰 ${escHtml(msg.amount)}</div>`;
+    }
+    if (msg.type === 'membership') {
+      inner += `<div class="superchat-amount" style="color:var(--accent)">🎖 New Member</div>`;
+    }
+
+    inner += `<div class="msg-text">${escHtml(msg.text)}</div>`;
+    el.innerHTML = inner;
+    return el;
+  }
+
+  // ── SYNC ──
+  function syncToTime() {
+    const input   = document.getElementById('timestampInput').value.trim();
+    const seconds = parseTimestamp(input);
+    if (seconds === null) {
+      alert('Enter a valid timestamp like 1:23:45 or 45:30');
+      return;
+    }
+    startChat(seconds);
+  }
+
+  function parseTimestamp(str) {
+    const parts = str.split(':').map(Number);
+    if (parts.some(isNaN)) return null;
+    if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+    if (parts.length === 2) return parts[0]*60 + parts[1];
+    if (parts.length === 1) return parts[0];
+    return null;
+  }
+
+  function formatTime(seconds) {
+    if (seconds < 0) seconds = 0;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  // ── AUTO SYNC ──
+  function toggleAutoSync() {
+    autoSyncEnabled = !autoSyncEnabled;
+    const btn = document.getElementById('autoSyncBtn');
+
+    if (autoSyncEnabled) {
+      // Resume from wherever the timestamp box currently shows
+      const input   = document.getElementById('timestampInput').value.trim();
+      const seconds = parseTimestamp(input);
+      if (seconds === null) {
+        autoSyncEnabled = false;
+        return;
+      }
+      btn.textContent = '⚡ Auto-sync: ON';
+      btn.className   = 'btn btn-danger';
+      startChat(seconds);
+    } else {
+      if (tickInterval) clearInterval(tickInterval);
+      tickInterval = null;
+      btn.textContent = '⚡ Auto-sync: OFF';
+      btn.className   = 'btn';
+    }
+  }
+
+  // ── SCROLL LOCK ──
+  function toggleScrollLock() {
+    scrollLocked = !scrollLocked;
+    const btn = document.getElementById('scrollLockBtn');
+    btn.textContent = scrollLocked ? 'ON' : 'OFF';
+    btn.className = 'scroll-lock-btn' + (scrollLocked ? ' active' : '');
+  }
+
+  // ── HELPERS ──
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  const colorCache = {};
+  const authorColors = ['#ff7f7f','#ffb347','#ffff66','#90ee90','#87ceeb','#da70d6','#98ff98','#f08080','#87cefa','#ffb6c1','#ffa07a','#20b2aa','#778899','#b0c4de','#ff6347'];
+  function randomAuthorColor(name) {
+    if (colorCache[name]) return colorCache[name];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    const color = authorColors[Math.abs(hash) % authorColors.length];
+    colorCache[name] = color;
+    return color;
+  }
+
+  // ── KEYBOARD SHORTCUT ──
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement === document.getElementById('timestampInput')) {
+      syncToTime();
+    }
+  });
+</script>
+</body>
+</html>
